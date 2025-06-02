@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, List, Optional
 from urllib.parse import urlparse
 
+from boto3.s3.transfer import TransferConfig
 import boto3
 import botocore.exceptions
 import os
@@ -120,6 +121,27 @@ class StorageProviderSettings(StorageProviderSettingsBase):
             "env_var": False,
             "required": False,
             "type": int,
+        },
+    )
+    transfer_config: Optional[dict] = field(
+        default=None,
+        metadata={
+            "help": "S3 transfer configuration (e.g. multipart threshold, etc)",
+            # This will populate a "TransferConfig" object which will then be used
+            # in the "Config" parameter of the Object().upload_file() method
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/object/upload_file.html
+            "env_var": False,
+            "required": False,
+        },
+    )
+    extra_args: Optional[dict] = field(
+        default=None,
+        metadata={
+            "help": "Extra arguments for the S3 client operation (e.g. ACLs, etc)",
+            # This will populate the "ExtraArgs" parameter of the Object().upload_file() method
+            # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/object/upload_file.html
+            "env_var": False,
+            "required": False,
         },
     )
 
@@ -334,6 +356,11 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
     # StorageObjectReadWrite.
 
     def store_object(self):
+        if self.provider.transfer_config:
+            transfer_config = TransferConfig(**self.provider.transfer_config)
+        else:
+            transfer_config = None
+
         # Ensure that the object is stored at the location specified by
         # self.local_path().
         if not self.bucket_exists():
@@ -349,10 +376,12 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
             for item in self.local_path().rglob("*"):
                 if item.is_file():
                     self.s3obj(subkey=item.relative_to(self.local_path())).upload_file(
-                        item
+                        item,
+                        Config=transfer_config,
+                        ExtraArgs=self.provider.extra_args
                     )
         else:
-            self.s3obj().upload_file(self.local_path())
+            self.s3obj().upload_file(self.local_path(), Config=transfer_config, ExtraArgs=self.provider.extra_args)
 
     def remove(self):
         # Remove the object from the storage.
