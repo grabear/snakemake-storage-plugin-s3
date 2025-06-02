@@ -356,8 +356,8 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
     # StorageObjectReadWrite.
 
     def store_object(self):
-        if self.provider.transfer_config:
-            transfer_config = TransferConfig(**self.provider.transfer_config)
+        if self.provider.settings.transfer_config:
+            transfer_config = TransferConfig(**self.provider.settings.transfer_config)
         else:
             transfer_config = None
 
@@ -378,10 +378,10 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
                     self.s3obj(subkey=item.relative_to(self.local_path())).upload_file(
                         item,
                         Config=transfer_config,
-                        ExtraArgs=self.provider.extra_args
+                        ExtraArgs=self.provider.settings.extra_args
                     )
         else:
-            self.s3obj().upload_file(self.local_path(), Config=transfer_config, ExtraArgs=self.provider.extra_args)
+            self.s3obj().upload_file(self.local_path(), Config=transfer_config, ExtraArgs=self.provider.settings.extra_args)
 
     def remove(self):
         # Remove the object from the storage.
